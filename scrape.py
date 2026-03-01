@@ -1,46 +1,38 @@
+"""Scrape 10 table pages and sum all values."""
 import asyncio
 from playwright.async_api import async_playwright
 
-async def run():
-    seeds = range(20, 30)
-    total_sum = 0
-    
+SEEDS = [20,21,22,23,24,25,26,27,28,29]
+BASE_URL = "https://sanand0.github.io/tdsdata/js_table/?seed="
+
+
+async def main():
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
-        page = await p.new_page()
-        
-        for seed in seeds:
-            url = f"https://sanand0.github.io/tdsdata/js_table/?seed={seed}"
-            print(f"Scraping: {url}")
-            
-            try:
-                await page.goto(url, wait_until="networkidle")
-                # Wait specifically for the table body to have content
-                await page.wait_for_selector("td")
-                
-                # Small sleep to ensure all JS rows are injected
-                await asyncio.sleep(1)
-                
-                cells = await page.query_selector_all("td")
-                for cell in cells:
-                    text = await cell.inner_text()
-                    # Remove commas and whitespace
-                    clean_text = text.replace(',', '').strip()
-                    if clean_text:
-                        try:
-                            total_sum += float(clean_text)
-                        except ValueError:
-                            continue
-            except Exception as e:
-                print(f"Error on seed {seed}: {e}")
-        
+        browser = await p.chromium.launch(headless=True)
+        grand_total = 0
+
+        for seed in SEEDS:
+            page = await browser.new_page()
+            url = f"{BASE_URL}{seed}"
+            await page.goto(url, wait_until="networkidle")
+            await page.wait_for_selector("table")
+
+            cells = await page.query_selector_all("table td")
+            page_sum = 0
+            for cell in cells:
+                text = await cell.inner_text()
+                try:
+                    page_sum += int(text.strip())
+                except ValueError:
+                    pass
+
+            print(f"Seed {seed}: sum = {page_sum}")
+            grand_total += page_sum
+            await page.close()
+
         await browser.close()
-    
-    # Printing in multiple formats to ensure the validator catches it
-    print(f"RESULT_START")
-    print(f"Total Sum: {int(total_sum)}")
-    print(f"FINAL_TOTAL_SUM: {int(total_sum)}")
-    print(f"RESULT_END")
+        print(f"\nGRAND TOTAL: {grand_total}")
+
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    asyncio.run(main())
